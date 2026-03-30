@@ -54,6 +54,12 @@ namespace
     {
         std::vector<DWORD> processIds;
 
+        DWORD currentSessionId = 0;
+        if (!ProcessIdToSessionId(GetCurrentProcessId(), &currentSessionId))
+        {
+            return processIds;
+        }
+
         HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if (snapshot == INVALID_HANDLE_VALUE)
         {
@@ -69,7 +75,12 @@ namespace
             {
                 if (_wcsicmp(entry.szExeFile, ProcessName) == 0)
                 {
-                    processIds.push_back(entry.th32ProcessID);
+                    DWORD processSessionId = 0;
+                    if (ProcessIdToSessionId(entry.th32ProcessID, &processSessionId) &&
+                        processSessionId == currentSessionId)
+                    {
+                        processIds.push_back(entry.th32ProcessID);
+                    }
                 }
             } while (Process32NextW(snapshot, &entry));
         }
