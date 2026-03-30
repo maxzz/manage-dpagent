@@ -1,8 +1,10 @@
 #include <windows.h>
 #include <tlhelp32.h>
 
+#include <cstdio>
 #include <cwchar>
 #include <iostream>
+#include <string>
 #include <vector>
 
 namespace
@@ -46,6 +48,25 @@ namespace
         return !GetDpAgentProcessIds().empty();
     }
 
+    void ShowFailureConsole()
+    {
+        if (!AllocConsole())
+        {
+            return;
+        }
+
+        FILE* stream = nullptr;
+        freopen_s(&stream, "CONIN$", "r", stdin);
+        freopen_s(&stream, "CONOUT$", "w", stdout);
+        freopen_s(&stream, "CONOUT$", "w", stderr);
+
+        std::wcerr << L"DpAgent.exe is still running and cannot be closed after the attempt." << std::endl;
+        std::wcerr << L"Press Enter to exit..." << std::endl;
+
+        std::wstring line;
+        std::getline(std::wcin, line);
+    }
+
     bool KillDpAgent()
     {
         const auto processIds = GetDpAgentProcessIds();
@@ -87,16 +108,15 @@ namespace
     }
 }
 
-int wmain()
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
     const bool killResult = KillDpAgent();
 
     if (!killResult && IsDpAgentRunning())
     {
-        std::wcerr << L"DpAgent.exe is still running and cannot be closed after the attempt." << std::endl;
+        ShowFailureConsole();
         return 1;
     }
 
-    std::wcout << L"Startup check completed." << std::endl;
     return 0;
 }
