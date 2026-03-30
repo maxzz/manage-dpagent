@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <shellapi.h>
 #include <tlhelp32.h>
 
 #include <cstdio>
@@ -14,6 +15,40 @@ namespace
     constexpr DWORD FailureDelayMs = 3000;
     constexpr wchar_t ProcessName[] = L"DPAgent.exe";
     constexpr wchar_t WindowClassName[] = L"DigitalPersona Pro5.x Agent Window Class";
+
+    struct CliConfig
+    {
+        bool silentMode = true;
+    };
+
+    CliConfig BuildCliConfig()
+    {
+        CliConfig config;
+
+        int argc = 0;
+        LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+        if (argv == nullptr)
+        {
+            return config;
+        }
+
+        for (int i = 1; i < argc; ++i)
+        {
+            const std::wstring argument = argv[i];
+
+            if (argument == L"--silent" || argument == L"/silent")
+            {
+                config.silentMode = true;
+            }
+            else if (argument == L"--no-silent" || argument == L"/no-silent")
+            {
+                config.silentMode = false;
+            }
+        }
+
+        LocalFree(argv);
+        return config;
+    }
 
     std::vector<DWORD> GetDpAgentProcessIds()
     {
