@@ -121,10 +121,9 @@ namespace
             return true;
         }
 
-		// Somehow there can be multiple DPAgent.exe processes running at the same time, so we need to loop through all of them and try to close them one by one
-		// One ghost DpAgent.exe that cannot be closed (don't know why), and one x64 and one x86 DpAgent.exe that can be closed successfully. 
-        // The ghost process is not visible in Task Manager, but it is visible in Process Explorer and it cannot be closed by any means, 
-        // but it also doesn't cause any issues, so we can just ignore it and close the other two processes successfully.
+		// One DpAgent.exe is running in session 1 and this DpAgent.exe cannot be and should not be terminated.
+        // The other two DpAgent.exe processes are one x64 and one x86 DpAgent.exe are running in the current session 
+        // and can be closed successfully.
 
         for (DWORD processId : processIds)
         {
