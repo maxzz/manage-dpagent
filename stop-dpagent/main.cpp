@@ -67,7 +67,7 @@ namespace
         std::getline(std::wcin, line);
     }
 
-    bool KillDpAgent()
+    bool KillDpAgents()
     {
         const auto processIds = GetDpAgentProcessIds();
         if (processIds.empty())
@@ -93,7 +93,7 @@ namespace
 
                 if (waitResult == WAIT_OBJECT_0)
                 {
-                    Sleep(SuccessDelayMs);
+					//Sleep(SuccessDelayMs); //don't need to wait after successful close, we can check for the next process immediately
                     return true;
                 }
             }
@@ -103,14 +103,14 @@ namespace
             }
         }
 
-        Sleep(FailureDelayMs);
+		//Sleep(FailureDelayMs); // if none of the processes were closed within the loop return false immediately without waiting for the timeout
         return false;
     }
 }
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
-    const bool killResult = KillDpAgent();
+    const bool killResult = KillDpAgents();
 
     if (!killResult && IsDpAgentRunning())
     {
