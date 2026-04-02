@@ -93,11 +93,11 @@ namespace
         return !GetDpAgentProcessIds().empty();
     }
 
-    void ShowFailureConsole()
+    bool InitializeConsole()
     {
         if (!AllocConsole())
         {
-            return;
+            return false;
         }
 
         FILE* stream = nullptr;
@@ -105,8 +105,30 @@ namespace
         freopen_s(&stream, "CONOUT$", "w", stdout);
         freopen_s(&stream, "CONOUT$", "w", stderr);
 
-        std::wcerr << L"DpAgent.exe is still running and cannot be closed after the attempt." << std::endl;
-        std::wcerr << L"Press Enter to exit..." << std::endl;
+        return true;
+    }
+
+    void WriteConsoleLine(const wchar_t* line)
+    {
+        if (!InitializeConsole())
+        {
+			//TODO: show a message box if console initialization fails since we cannot write to console to show the error
+            MessageBoxW(nullptr, L"Failed to initialize console.", L"Error", MB_OK | MB_ICONERROR);
+            return;
+		}
+
+        std::wcerr << line << std::endl;
+    }
+
+    void ShowFailureConsole()
+    {
+        if (!InitializeConsole())
+        {
+            return;
+        }
+
+        WriteConsoleLine(L"DpAgent.exe is still running and cannot be closed after the attempt.");
+        WriteConsoleLine(L"Press Enter to exit...");
 
         std::wstring line;
         std::getline(std::wcin, line);
@@ -161,6 +183,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
     const CliConfig cliConfig = BuildCliConfig();
     const bool killResult = KillDpAgents();
+
+    //MessageBoxW(nullptr, L"Failed to initialize console.", L"Error", MB_OK | MB_ICONERROR);
 
     if (!killResult && IsDpAgentRunning())
     {
