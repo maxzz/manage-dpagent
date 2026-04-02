@@ -108,15 +108,13 @@ namespace
         return true;
     }
 
+    void ShowMessageBox(const wchar_t* message, const wchar_t* title, UINT type)
+    {
+        MessageBoxW(nullptr, message, title, type);
+    }
+
     void WriteConsoleLine(const wchar_t* line)
     {
-        if (!InitializeConsole())
-        {
-			//TODO: show a message box if console initialization fails since we cannot write to console to show the error
-            MessageBoxW(nullptr, L"Failed to initialize console.", L"Error", MB_OK | MB_ICONERROR);
-            return;
-		}
-
         std::wcerr << line << std::endl;
     }
 
@@ -124,6 +122,7 @@ namespace
     {
         if (!InitializeConsole())
         {
+            ShowMessageBox(L"Failed to initialize console.", L"Error", MB_OK | MB_ICONERROR);
             return;
         }
 
@@ -133,6 +132,8 @@ namespace
         std::wstring line;
         std::getline(std::wcin, line);
     }
+
+
 
     bool KillDpAgents()
     {
@@ -182,16 +183,26 @@ namespace
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
     const CliConfig cliConfig = BuildCliConfig();
-    const bool killResult = KillDpAgents();
+    const bool killedAll = KillDpAgents();
 
-    //MessageBoxW(nullptr, L"Failed to initialize console.", L"Error", MB_OK | MB_ICONERROR);
-
-    if (!killResult && IsDpAgentRunning())
+    if (!killedAll)
     {
-        if (!cliConfig.silentMode)
+        const auto pids = GetDpAgentProcessIds();
+        std::wstring msg;
+        if (pids.empty())
         {
-            ShowFailureConsole();
+            msg = L"DpAgent.exe is still running, but no process IDs were found.";
         }
+        else
+        {
+            msg = L"DpAgent.exe is still running (PIDs):\n";
+            for (DWORD pid : pids)
+            {
+                msg += std::to_wstring(pid) + L"\n";
+            }
+        }
+
+        ShowMessageBox(msg.c_str(), L"DpAgent running", MB_OK | MB_ICONWARNING);
 
         return 1;
     }
