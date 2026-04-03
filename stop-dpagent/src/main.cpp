@@ -88,6 +88,49 @@ namespace
         return rv;
     }
 
+    struct WindowSearchContext
+    {
+        const std::vector<DWORD>* processIds = nullptr;
+        std::vector<HWND>* windowHandles = nullptr;
+    };
+
+    BOOL CALLBACK CollectDpAgentWindows(HWND hWnd, LPARAM lParam)
+    {
+        wchar_t className[256] = {};
+        if (GetClassNameW(hWnd, className, ARRAYSIZE(className)) == 0)
+        {
+            return TRUE;
+        }
+
+        if (_wcsicmp(className, WindowClassName) != 0)
+        {
+            return TRUE;
+        }
+
+        DWORD processId = 0;
+        GetWindowThreadProcessId(hWnd, &processId);
+
+        auto* context = reinterpret_cast<WindowSearchContext*>(lParam);
+        for (DWORD candidateProcessId : *context->processIds)
+        {
+            if (candidateProcessId == processId)
+            {
+                context->windowHandles->push_back(hWnd);
+                break;
+            }
+        }
+
+        return TRUE;
+    }
+
+    std::vector<HWND> GetDpAgentWindowHandles(const std::vector<DWORD>& processIds)
+    {
+        std::vector<HWND> rv;
+        WindowSearchContext context = { &processIds, &rv };
+        EnumWindows(CollectDpAgentWindows, reinterpret_cast<LPARAM>(&context));
+        return rv;
+    }
+
     bool IsDpAgentRunning()
     {
         return !GetDpAgentProcessIds().empty();
@@ -143,9 +186,12 @@ namespace
             return true;
         }
 
-		// One DpAgent.exe is running in session 1 and this DpAgent.exe cannot be and should not be terminated.
+        // One DpAgent.exe is running in session 1 and this DpAgent.exe cannot be and should not be terminated.
         // The other two DpAgent.exe processes are one x64 and one x86 DpAgent.exe are running in the current session 
         // and can be closed successfully.
+
+        std::vector<HANDLE> processHandles;
+        processHandles.reserve(processIds.size());
 
         for (DWORD processId : processIds)
         {
@@ -155,28 +201,53 @@ namespace
                 continue;
             }
 
-            HWND hWnd = FindWindowW(WindowClassName, nullptr);
-            if (hWnd != nullptr)
+            processHandles.push_back(processHandle);
+        }
+
+        const auto windowHandles = GetDpAgentWindowHandles(processIds);
+        if (windowHandles.empty())
+        {
+            for (HANDLE processHandle : processHandles)
             {
-                PostMessageW(hWnd, WM_CLOSE, 0, 0);
-
-                DWORD waitResult = WaitForSingleObject(processHandle, WaitTimeoutMs);
                 CloseHandle(processHandle);
+            }
 
-                if (waitResult == WAIT_OBJECT_0)
+            return false;
+        }
+
+        for (HWND hWnd : windowHandles)
+        {
+            PostMessageW(hWnd, WM_CLOSE, 0, 0);
+        }
+
+        const ULONGLONG waitUntil = GetTickCount64() + WaitTimeoutMs;
+        while (!processHandles.empty() && GetTickCount64() < waitUntil)
+        {
+            for (auto it = processHandles.begin(); it != processHandles.end();)
+            {
+                if (WaitForSingleObject(*it, 0) == WAIT_OBJECT_0)
                 {
-					//Sleep(SuccessDelayMs); //don't need to wait after successful close, we can check for the next process immediately
-                    return true;
+                    CloseHandle(*it);
+                    it = processHandles.erase(it);
+                }
+                else
+                {
+                    ++it;
                 }
             }
-            else
+
+            if (!processHandles.empty())
             {
-                CloseHandle(processHandle);
+                Sleep(100);
             }
         }
 
-		//Sleep(FailureDelayMs); // if none of the processes were closed within the loop return false immediately without waiting for the timeout
-        return false;
+        for (HANDLE processHandle : processHandles)
+        {
+            CloseHandle(processHandle);
+        }
+
+        return GetDpAgentProcessIds().empty();
     }
 }
 
