@@ -1,0 +1,15 @@
+{
+    "version": "0.2.1",
+    "configurations": [
+      {
+        "name": "Debug stop-dpagent (x64)",
+        "type": "cppvsdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/x64/Debug/stop-dpagent.exe",
+        "args": ["--no-silent"],
+        "cwd": "${workspaceFolder}",
+        "console": "externalTerminal"
+      }
+    ]
+  }
+  
